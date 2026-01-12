@@ -1,0 +1,36 @@
+# HC Site Configuration
+# Overrides default.yaml settings
+
+site:
+  name: "HC"
+  description: "HC observation site"
+  bulk_density: 1.22  # g/cm³ (사용자 코드에서 확인된 값)
+  field_capacity: 0.28  # 추정값 (조정 필요)
+  
+  # 추가 메타데이터
+  location:
+    latitude: 38.79698
+    longitude: 110.35963
+  
+  soil_info:
+    texture: "Sandy loam"  # 추정 (데이터 확인 필요)
+    organic_matter: 0.22  # g/kg
+
+# HC 관측소 특화 설정
+analysis:
+  # HC는 기본값 사용
+  max_extent: 150
+  
+interpolation:
+  # HC 특화 clip 범위 (필요시 활성화)
+  # clip_min: 0.05
+  # clip_max: 0.40
+
+# 날짜 범위 (HC 데이터 기준)
+dates:
+  calibration:
+    - "2024-07-23"  # N0 계산용
+  analysis:
+    - "2024-08-16"
+    - "2024-09-20"
+    - "2024-10-20"

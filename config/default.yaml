@@ -1,0 +1,146 @@
+# =============================================================================
+# CRNP Footprint Analysis - Default Configuration
+# Base path: E:\02.Data\05.CRNP\02.UTS_system\98.Code_test\01.FootprintRadius\Footprint_Depth
+# =============================================================================
+
+project:
+  name: "CRNP Footprint Analysis"
+  version: "2.0.0"
+  base_path: "E:/02.Data/05.CRNP/02.UTS_system/98.Code_test/01.FootprintRadius/Footprint_Depth"
+
+# 기본 사이트 정보 (site-specific YAML에서 오버라이드)
+site:
+  name: "Default"
+  bulk_density: 1.40
+  field_capacity: 0.30
+
+# 경로 설정 (변수 치환 지원)
+paths:
+  # 기본 경로들
+  data_root: "{base_path}/data"
+  input_root: "{data_root}/input/{site_name}"
+  output_root: "{data_root}/output/{site_name}"
+  
+  # 입력 파일들
+  input:
+    geo: "{input_root}/geo_locations.xlsx"
+    swc: "{input_root}/{site_name}_FDR_daily_depths.xlsx"
+    pressure: "{input_root}/{site_name}_CRNP_Input.xlsx"
+  
+  # 출력 폴더들
+  output:
+    base: "{output_root}"
+    plots: "{output_root}/plots"
+    results: "{output_root}/results"
+    diagnostics: "{output_root}/diagnostics"
+
+# 분석 설정
+analysis:
+  max_extent: 150
+  resolution: 10
+  ddeg: 30
+  
+  use_pressure: true
+  P0: 1013.25
+  alpha_p: 1.0
+  
+  base_veg_height: 0.3
+
+# 토양수분 내삽
+interpolation:
+  method: "rbf"
+  
+  rbf:
+    function: "thin_plate"
+    smooth: 0
+  
+  edge_control: true
+  hull_buffer_m: 15.0
+  outside_fill: "nan"  # 원본 설정
+  
+  # 값 제한 (주석 = 비활성화)
+  # clip_min: 0.05
+  # clip_max: 0.50
+  
+  fill_remaining_nans: false  # 원본 설정
+
+# 물리 파라미터
+physics:
+  # N(θ) 관계식
+  neutron_moisture:
+    N0: 1950
+    p1: 0.0226
+    p2: 0.207
+    p3: 1.024
+    p4: -0.0093
+    p5: 0.000074
+    p6: 1.625
+    p7: 0.235
+    p8: -0.0029
+  
+  # 깊이 가중 함수
+  depth_weighting:
+    p0: 8.321
+    p1: 0.14249
+    p2: 0.86655
+    p3: 26.42
+    p4: 0.0567
+  
+  # 수평 가중 함수
+  radial_weighting:
+    a1: 30.0
+    b1: 1.6
+    a2: 1.0
+    b2: 100.0
+    c: 3.7
+  
+  # 식생 영향
+  vegetation:
+    c1: 0.17
+    c2: 0.41
+    c3: 7.0
+
+# 플롯 설정
+plotting:
+  global:
+    dpi: 300
+    format: "png"
+    font_size: 10
+  
+  panel_swc:
+    figsize: [7.8, 6.5]
+    cmap: "Blues"
+    vmin: 0.15
+    vmax: 0.40
+    marker_size: 160
+  
+  panel_veg:
+    figsize: [7.8, 6.5]
+    cmap: "YlGn"
+    vmin: 0.0
+    vmax: 0.5
+  
+  panel_contrib:
+    figsize: [8.8, 7.2]
+    cmap: "hot"
+    norm_mode: "log"
+    mass_level: 0.86
+    contour_color: "red"
+    contour_linewidth: 3.0
+    show_sector_rays: true
+  
+  panel_depth:  # ← 이 섹션 전체 교체
+    figsize: [8, 6]
+    colors:  # ← 리스트 형식으로
+      - '#1f77b4'
+      - '#ff7f0e'
+      - '#2ca02c'
+      - '#d62728'
+    alpha: 0.7
+  
+  panel_xsection:
+    figsize: [20, 9]
+    bg_threshold: 0.0005
+    gamma: 0.45
+    n_levels: 6
+    cmap: "hot_r"

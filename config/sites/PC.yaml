@@ -1,0 +1,22 @@
+# PC Site Configuration
+
+site:
+  name: "PC"
+  description: "PC observation site"
+  bulk_density: 1.35  # 추정값 (데이터 확인 필요)
+  field_capacity: 0.30
+  
+  location:
+    latitude: null  # 데이터에서 읽어오기
+    longitude: null
+
+analysis:
+  max_extent: 150
+
+dates:
+  calibration:
+    - "2024-07-23"
+  analysis:
+    - "2024-08-16"
+    - "2024-09-20"
+    - "2024-10-20"
