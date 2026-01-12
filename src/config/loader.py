@@ -1,183 +1,166 @@
 """
-Configuration loader with path variable substitution
+Configuration Loader
 """
+import os
 import yaml
-from pathlib import Path
-from typing import Any, Dict, Optional
 import copy
 
 class Config:
-    """YAML 기반 설정 관리"""
+    """Configuration management class"""
     
-    def __init__(self, config_path: Optional[str] = None):
+    def __init__(self, config_dir=None):
         """
         Args:
-            config_path: YAML 파일 경로. None이면 default.yaml 사용
+            config_dir: config 디렉토리 경로 (None이면 자동 탐색)
         """
-        if config_path is None:
-            config_path = Path(__file__).parent.parent.parent / "config" / "default.yaml"
+        # Config 디렉토리 찾기
+        if config_dir is None:
+            # 현재 파일 기준으로 프로젝트 루트 찾기
+            current_file = os.path.abspath(__file__)
+            src_config_dir = os.path.dirname(current_file)
+            src_dir = os.path.dirname(src_config_dir)
+            project_root = os.path.dirname(src_dir)
+            config_dir = os.path.join(project_root, 'config')
         
-        self.config_path = Path(config_path)
-        self._config = self._load_yaml(self.config_path)
+        self.config_dir = config_dir
+        self.default_config_path = os.path.join(config_dir, 'default.yaml')
+        self.sites_dir = os.path.join(config_dir, 'sites')
         
-        # 원본 경로 템플릿 백업 (중요!)
+        # 설정 로드
+        self._config = self._load_yaml(self.default_config_path)
+        
+        # Path templates 보존 (동적 site 변경을 위해)
         self._path_templates = copy.deepcopy(self._config.get('paths', {}))
         
-        # 변수 치환
+        # 초기 변수 치환
         self._resolve_variables()
     
-    def _load_yaml(self, path: Path) -> Dict[str, Any]:
+    def _load_yaml(self, filepath):
         """YAML 파일 로드"""
-        if not path.exists():
-            raise FileNotFoundError(f"Config file not found: {path}")
-        
-        with open(path, 'r', encoding='utf-8') as f:
+        with open(filepath, 'r', encoding='utf-8') as f:
             return yaml.safe_load(f)
     
-    def _resolve_variables(self):
-        """
-        경로 변수 치환 (원본 템플릿에서 다시 생성)
-        """
-        # 변수 컨텍스트 (동적 site_name!)
-        context = {
-            'base_path': self._config['project']['base_path'],
-            'site_name': self._config['site']['name']
-        }
+    def _deep_merge(self, base, override):
+        """딕셔너리 재귀적 병합"""
+        result = copy.deepcopy(base)
         
-        # 원본 템플릿에서 다시 치환 (핵심!)
-        paths = copy.deepcopy(self._path_templates)
-        
-        # 1단계: 기본 경로들
-        for key in ['data_root', 'input_root', 'output_root']:
-            if key in paths:
-                paths[key] = self._substitute(paths[key], context)
-                context[key] = paths[key]
-        
-        # 2단계: input 경로들
-        if 'input' in paths:
-            for key, value in paths['input'].items():
-                paths['input'][key] = self._substitute(value, context)
-        
-        # 3단계: output 경로들
-        if 'output' in paths:
-            for key, value in paths['output'].items():
-                paths['output'][key] = self._substitute(value, context)
-        
-        # 치환된 경로로 업데이트
-        self._config['paths'] = paths
-    
-    def _substitute(self, template: str, context: Dict[str, str]) -> str:
-        """
-        템플릿 문자열에서 변수 치환
-        """
-        if not isinstance(template, str):
-            return template
-        
-        result = template
-        for key, value in context.items():
-            placeholder = f"{{{key}}}"
-            result = result.replace(placeholder, str(value))
+        for key, value in override.items():
+            if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+                result[key] = self._deep_merge(result[key], value)
+            else:
+                result[key] = copy.deepcopy(value)
         
         return result
     
-    def load_site(self, site_name: str):
+    def _resolve_variables(self):
+        """경로 변수 치환 (단계별로 계산)"""
+        # 기본값
+        base_path = self._config['project']['base_path']
+        site_name = self._config['site']['name']
+        
+        # 1단계: data_root
+        data_root = os.path.join(base_path, 'data')
+        
+        # 2단계: input_root, output_root
+        input_root = os.path.join(data_root, 'input', site_name)
+        output_root = os.path.join(data_root, 'output', site_name)
+        
+        # 전체 컨텍스트 (순서대로!)
+        context = {
+            'base_path': base_path,
+            'site_name': site_name,
+            'data_root': data_root,
+            'input_root': input_root,
+            'output_root': output_root,
+        }
+        
+        # Template에서 paths 재구성
+        paths = copy.deepcopy(self._path_templates)
+        
+        def resolve_dict(d, ctx):
+            """딕셔너리 재귀적 치환"""
+            result = {}
+            for k, v in d.items():
+                if isinstance(v, str):
+                    try:
+                        result[k] = v.format(**ctx)
+                    except KeyError as e:
+                        # 디버깅용
+                        print(f"Warning: Missing variable {e} in '{v}'")
+                        print(f"Available variables: {list(ctx.keys())}")
+                        raise
+                elif isinstance(v, dict):
+                    result[k] = resolve_dict(v, ctx)
+                else:
+                    result[k] = v
+            return result
+        
+        self._config['paths'] = resolve_dict(paths, context)
+    
+    def load_site(self, site_name):
         """
-        사이트별 설정 로드 및 병합
+        사이트별 설정 로드
         
         Args:
-            site_name: 'HC' or 'PC'
+            site_name: 사이트 이름 (예: 'HC', 'PC')
         """
-        site_path = self.config_path.parent / "sites" / f"{site_name}.yaml"
+        site_config_path = os.path.join(self.sites_dir, f'{site_name}.yaml')
         
-        if not site_path.exists():
-            raise FileNotFoundError(f"Site config not found: {site_path}")
+        if not os.path.exists(site_config_path):
+            raise FileNotFoundError(f"Site config not found: {site_config_path}")
         
-        site_config = self._load_yaml(site_path)
+        # 사이트 설정 로드
+        site_config = self._load_yaml(site_config_path)
         
-        # site_name 강제 업데이트
-        if 'site' not in site_config:
-            site_config['site'] = {}
-        site_config['site']['name'] = site_name
+        # 기본 설정과 병합
+        self._config = self._deep_merge(self._config, site_config)
         
-        # 병합
-        self._merge_config(site_config)
-        
-        # 변수 재치환 (원본 템플릿에서 다시!)
+        # 경로 재계산 (site_name이 바뀌었으므로)
         self._resolve_variables()
         
         print(f"✓ Loaded site config: {site_name}")
     
-    def _merge_config(self, override: Dict[str, Any]):
-        """설정 딕셔너리 병합 (override가 우선)"""
-        def merge_dict(base, override):
-            for key, value in override.items():
-                if key in base and isinstance(base[key], dict) and isinstance(value, dict):
-                    merge_dict(base[key], value)
-                else:
-                    base[key] = value
-        
-        merge_dict(self._config, override)
-    
-    def get(self, key_path: str, default=None) -> Any:
-        """
-        점 표기법으로 설정값 가져오기
-        
-        Examples:
-            >>> config.get('analysis.max_extent')
-            150
-        """
-        keys = key_path.split('.')
-        value = self._config
-        
-        for key in keys:
-            if isinstance(value, dict):
-                value = value.get(key, {})
-            else:
-                return default
-        
-        if value == {} or value is None:
-            return default
-        
-        return value
-    
-    def ensure_output_dirs(self):
-        """출력 디렉토리 생성"""
-        output_paths = self._config['paths']['output']
-        
-        for key, path in output_paths.items():
-            path = Path(path)
-            if not path.exists():
-                path.mkdir(parents=True, exist_ok=True)
-                print(f"✓ Created directory: {path}")
-    
-    # 편의 프로퍼티들
-    @property
-    def paths(self) -> Dict[str, Any]:
-        return self._config.get('paths', {})
+    # ===== 속성 접근자 =====
     
     @property
-    def analysis(self) -> Dict[str, Any]:
-        return self._config.get('analysis', {})
+    def project(self):
+        """프로젝트 설정"""
+        return self._config.get('project', {})
     
     @property
-    def interpolation(self) -> Dict[str, Any]:
-        return self._config.get('interpolation', {})
-    
-    @property
-    def physics(self) -> Dict[str, Any]:
-        return self._config.get('physics', {})
-    
-    @property
-    def plotting(self) -> Dict[str, Any]:
-        return self._config.get('plotting', {})
-    
-    @property
-    def site(self) -> Dict[str, Any]:
+    def site(self):
+        """사이트 설정"""
         return self._config.get('site', {})
     
     @property
-    def output(self) -> Dict[str, Any]:
-        return self._config.get('output', {})
+    def paths(self):
+        """경로 설정"""
+        return self._config.get('paths', {})
+    
+    @property
+    def analysis(self):
+        """분석 설정"""
+        return self._config.get('analysis', {})
+    
+    @property
+    def interpolation(self):
+        """Interpolation 설정"""
+        return self._config.get('interpolation', {})
+    
+    @property
+    def physics(self):
+        """물리 상수"""
+        return self._config.get('physics', {})
+    
+    @property
+    def plotting(self):
+        """플롯 설정"""
+        return self._config.get('plotting', {})
+    
+    def get(self, key, default=None):
+        """설정 값 가져오기"""
+        return self._config.get(key, default)
     
     def __repr__(self):
-        return f"Config(site={self.site.get('name', 'Unknown')})"
+        site_name = self._config.get('site', {}).get('name', 'Unknown')
+        return f"Config(site={site_name})"

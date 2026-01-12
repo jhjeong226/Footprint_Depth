@@ -11,35 +11,44 @@ from .footprint import FootprintCalculator
 class CRNPAnalyzer:
     """CRNP Footprint 분석기 (Horizontal + Vertical)"""
     
-    def __init__(self, config):
+    def __init__(self, config, geo_path, swc_path, pressure_path=None):
         """
         Args:
             config: Config 객체
+            geo_path: 지리 정보 파일 경로
+            swc_path: SWC 데이터 파일 경로
+            pressure_path: 기압 데이터 파일 경로 (optional)
         """
         self.config = config
+        
+        # 물리 계산 초기화
         self.physics = CRNPPhysics(config)
+        
+        # SWC 보간 초기화 - Config 객체 전체 전달
         self.interpolator = SWCInterpolator(config)
-        self.footprint_calc = FootprintCalculator(self.physics)
+        
+        # Footprint 계산기
+        self.footprint_calc = FootprintCalculator(config)
         
         # 데이터 로드
-        self._load_data()
+        self._load_data(geo_path, swc_path, pressure_path)
         
-    def _load_data(self):
-        """데이터 파일 로드"""
-        paths = self.config.paths
+    def _load_data(self, geo_path, swc_path, pressure_path=None):
+        """
+        데이터 파일 로드
         
-        # Geo locations
-        geo_df_raw = pd.read_excel(paths['input']['geo'])
+        Args:
+            geo_path: 지리 정보 파일 경로
+            swc_path: SWC 데이터 파일 경로  
+            pressure_path: 기압 데이터 파일 경로 (optional)
+        """
+        import os
+        import pandas as pd
         
-        # SWC data
-        self.swc_df = pd.read_excel(paths['input']['swc'])
+        # GEO 파일 로드
+        geo_df_raw = pd.read_excel(geo_path)
         
-        if "Date" not in self.swc_df.columns:
-            raise ValueError("SWC file must contain a 'Date' column.")
-        
-        self.swc_df["Date"] = pd.to_datetime(self.swc_df["Date"], errors="coerce")
-        
-        # CRNP 위치
+        # CRNP 위치 찾기
         if "id" in geo_df_raw.columns:
             crnp_row = geo_df_raw[geo_df_raw["id"] == "CRNP"]
         else:
@@ -58,17 +67,25 @@ class CRNPAnalyzer:
         else:
             self.geo_df = geo_df_raw.copy()
         
+        # 상대 좌표 계산
         self.calculate_relative_coordinates()
         
-        # 센서 ID
+        # SWC 파일 로드
+        self.swc_df = pd.read_excel(swc_path)
+        
+        if "Date" not in self.swc_df.columns:
+            raise ValueError("SWC file must contain a 'Date' column.")
+        
+        self.swc_df["Date"] = pd.to_datetime(self.swc_df["Date"], errors="coerce")
+        
+        # 센서 ID 목록
         self.sensor_ids = [c for c in self.swc_df.columns if c != "Date"]
         if len(self.sensor_ids) == 0:
-            raise ValueError("No sensor columns found.")
+            raise ValueError("No sensor columns found in SWC file.")
         
-        # Pressure data (optional)
+        # Pressure 데이터 로드 (optional)
         self.pressure_daily = None
-        pressure_path = paths['input'].get('pressure')
-        if pressure_path and os.path.exists(pressure_path):
+        if pressure_path is not None and os.path.exists(pressure_path):
             self.pressure_daily = self.load_pressure_daily(pressure_path)
         
         print(f"✓ Loaded {len(self.sensor_ids)} sensors")

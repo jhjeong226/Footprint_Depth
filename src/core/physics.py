@@ -129,3 +129,39 @@ class CRNPPhysics:
         
         Args:
             N: 중성자 카운트
+            h: 공기 습도
+            N0: 건조 토양 플럭스
+            bulk_density: 토양 밀도
+        
+        Returns:
+            theta: 토양 수분 (m³/m³)
+        """
+        a0 = 0.0808
+        a1 = 0.372
+        a2 = 0.115
+        
+        theta = (a0 / (N / N0 - a1) - a2) * bulk_density
+        
+        return theta
+    
+    def vegetation_correction_factor(self, theta, veg_height):
+        """
+        식생 보정 계수
+        
+        Based on: Schrön et al. (2017)
+        
+        Args:
+            theta: 토양 수분
+            veg_height: 식생 높이 (m)
+        
+        Returns:
+            fveg: 식생 보정 계수
+        """
+        params = self.physics['vegetation']
+        c1 = params['c1']
+        c2 = params['c2']
+        c3 = params['c3']
+        
+        fveg = 1 - c1 * (1 - np.exp(-c2 * veg_height)) * (1 + np.exp(-c3 * theta))
+        
+        return fveg
