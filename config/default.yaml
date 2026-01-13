@@ -41,9 +41,9 @@ analysis:
 interpolation:
   method: "rbf"
   rbf_function: "thin_plate"
-  rbf_smooth: 0
+  rbf_smooth: 0.1
   edge_control: true
-  hull_buffer_m: 1500.0
+  hull_buffer_m: 200.0
   outside_fill: "nan"
   
   # clip_min: 0.05

@@ -17,7 +17,9 @@ class SWCInterpolator:
         self.interp_config = config.interpolation
     
     def interpolate(self, sensor_locations, swc_values, valid_mask, 
-                   max_extent=150, resolution=10):
+                   max_extent=150, resolution=10,
+                   rbf_function=None,
+                   rbf_smooth=None):
         """
         토양수분 공간 내삽
         
@@ -31,6 +33,12 @@ class SWCInterpolator:
         Returns:
             Xi, Yi, Zi: 내삽된 그리드
         """
+        # Config에서 기본값 읽기
+        if rbf_function is None:
+            rbf_function = self.config.interpolation.get('rbf_function', 'thin_plate')
+        if rbf_smooth is None:
+            rbf_smooth = self.config.interpolation.get('rbf_smooth', 0.0)
+        
         # 설정 읽기
         method = self.interp_config.get('method', 'rbf')
         edge_control = self.interp_config.get('edge_control', True)
@@ -63,7 +71,7 @@ class SWCInterpolator:
             smooth = rbf_config.get('smooth', 0)
             
             rbf = Rbf(x_valid, y_valid, swc_valid, 
-                     function=function, smooth=smooth)
+                     function=rbf_function, smooth=rbf_smooth)
             Zi = rbf(Xi, Yi)
         else:
             # Griddata (linear, cubic, nearest)

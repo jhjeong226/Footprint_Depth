@@ -37,6 +37,13 @@ def convex_hull_mask(xy_points, Xi, Yi, buffer_m=0.0):
 def build_amoeba_boundary_polyline(sectors, arc_step_deg=1.0):
     """
     30° 섹터별 R86(φ)로 연속 경계선 생성
+
+    30° 섹터별 rp로 연속 경계선 생성 (polyline)
+    
+    NOTE: 이것은 directional R86 값들을 연결한 것으로,
+    TRUE mass contour와는 다릅니다!
+    실제 신호 기여 경계를 보려면 mass_contour_field와 
+    draw_mass_contour를 사용하세요.
     
     Args:
         sectors: [{'phi0': 0, 'phi1': 30, 'rp': 120}, ...]
@@ -96,3 +103,43 @@ def plot_sector_rays(ax, max_extent, ddeg, **plot_kwargs):
             [0, max_extent * np.sin(rad)],
             **plot_kwargs
         )
+
+def mass_contour_field(W, eps=1e-30):
+    """
+    W(=kernel or contribution)가 주어졌을 때,
+    각 픽셀 i에 대해:
+      Q_i = sum(W_j where W_j >= W_i)
+    를 계산한 필드 Q를 반환.
+    
+    즉, Q=0.86 등고선은 '상위 기여 영역이 86%가 되는 경계' (HDR mass contour).
+    이것이 TRUE contour입니다!
+    """
+    W = np.asarray(W, float)
+    W = np.where(np.isfinite(W), W, 0.0)
+    W = np.clip(W, 0.0, None)
+
+    flat = W.ravel()
+    order = np.argsort(flat)[::-1]  # descending
+    sorted_w = flat[order]
+
+    csum = np.cumsum(sorted_w)
+    total = csum[-1] if csum.size > 0 else 0.0
+    if total <= eps:
+        return np.zeros_like(W, dtype=float)
+
+    csum /= total  # now [0,1]
+    
+    inv = np.empty_like(order)
+    inv[order] = np.arange(order.size)
+    Q_flat = csum[inv]
+    return Q_flat.reshape(W.shape)
+
+
+def draw_mass_contour(ax, Xi, Yi, W, level=0.86, color="red", lw=2.5, alpha=1.0, zorder=7):
+    """
+    W로부터 HDR mass contour (Q=level)을 계산해서 contour line을 그림.
+    이것이 실제 86% 신호 기여 경계선입니다!
+    """
+    Q = mass_contour_field(W)
+    cs = ax.contour(Xi, Yi, Q, levels=[level], colors=[color], linewidths=lw, alpha=alpha, zorder=zorder)
+    return cs

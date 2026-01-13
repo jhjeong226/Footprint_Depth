@@ -60,7 +60,6 @@ def print_results_summary(results):
 
 def main():
     """Main analysis workflow"""
-    # import numpy as np  ← 제거! (상단에 이미 있음)
     
     print_header()
     
@@ -94,7 +93,7 @@ def main():
     # [Step 3] Analyze dates
     analysis_dates = config.site.get('dates', {}).get('analysis', [])
     if not analysis_dates:
-        analysis_dates = ['2024-08-16', '2024-09-20', '2024-10-26']
+        analysis_dates = ['2025-04-30', '2025-07-20', '2025-10-26']
     
     print(f"\n[Step 3] Analysis dates: {analysis_dates}")
     

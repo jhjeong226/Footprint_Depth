@@ -3,7 +3,7 @@
 """
 from .panel_01_swc import plot_panel_swc
 from .panel_02_veg import plot_panel_veg
-from .panel_03_contrib import plot_panel_footprint_amoeba
+from .panel_03_cumulative import plot_panel_footprint_cumulative
 from .panel_04_depth import plot_panel_depth_layers
 from .panel_05_xsection import plot_panel_footprint_crosssection
 
@@ -49,12 +49,13 @@ def save_all_panels(config, analyzer, results, out_dir, prefix="crnp"):
     )
     
     # Panel 3: Footprint contribution
-    plot_panel_footprint_amoeba(
+    plot_panel_footprint_cumulative(
         results,
-        os.path.join(out_dir, f"{prefix}_{d}_03_footprint_boundary.png"),
+        os.path.join(out_dir, f"{prefix}_{d}_03_footprint.png"),
         config,
-        norm_mode="log",
-        boundary_lw=2.0
+        cumulative_min=0.0,   # 0%부터
+        cumulative_max=1.0,   # 100%까지
+        n_levels=10
     )
     
     # Panel 4: Depth layers

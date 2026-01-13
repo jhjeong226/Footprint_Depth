@@ -1,11 +1,14 @@
 """
-Panel 1: 토양수분 분포 맵
+Panel 1: 토양수분 분포 맵 (Fixed version)
 """
 import numpy as np
 import matplotlib.pyplot as plt
 from .base import setup_base_axes
 
-def plot_panel_swc(analyzer, results, save_path, config):
+def plot_panel_swc(analyzer, results, save_path, config,
+                  use_discrete_colors=None,
+                  n_levels=None,
+                  cmap_name=None):
     """
     Panel 1: SWC distribution
     
@@ -14,7 +17,38 @@ def plot_panel_swc(analyzer, results, save_path, config):
         results: analyze_single_day 결과
         save_path: 저장 경로
         config: Config 객체
+        use_discrete_colors: 구간별 색상 사용 (None이면 기본값)
+        n_levels: 색상 구간 개수 (None이면 기본값)
+        cmap_name: 컬러맵 이름 (None이면 기본값)
     """
+    # ✅ 안전한 기본값 설정
+    if use_discrete_colors is None:
+        try:
+            # Config에서 읽기 시도
+            use_discrete_colors = config.get('plotting.panel_swc.use_discrete_colors', True)
+            if use_discrete_colors is None:
+                use_discrete_colors = True
+        except:
+            use_discrete_colors = True
+    
+    if n_levels is None:
+        try:
+            # Config에서 읽기 시도
+            n_levels = config.get('plotting.panel_swc.n_levels', 12)
+            if n_levels is None:
+                n_levels = 12
+        except:
+            n_levels = 12
+    
+    if cmap_name is None:
+        try:
+            # Config에서 읽기 시도
+            cmap_name = config.get('plotting.panel_swc.cmap_name', 'Blues')
+            if cmap_name is None:
+                cmap_name = 'Blues'
+        except:
+            cmap_name = 'Blues'
+    
     max_extent = results["max_extent"]
     loc = analyzer.get_sensor_locations()
     swc_values = results["swc_values"]
@@ -25,23 +59,49 @@ def plot_panel_swc(analyzer, results, save_path, config):
     # SWC 맵
     Zi = results["swc_map"]
     Zi_masked = np.ma.masked_invalid(Zi)
-    cmap = plt.get_cmap("Blues").copy()
-    cmap.set_bad(alpha=0.0)
     
-    im = ax.imshow(
-        Zi_masked,
-        extent=[-max_extent, max_extent, -max_extent, max_extent],
-        origin="lower", cmap=cmap,
-        vmin=0.15, vmax=0.40,
-        interpolation="bilinear"
-    )
+    vmin, vmax = 0.15, 0.40
+    
+    # Discrete 또는 continuous 색상 선택
+    if use_discrete_colors:
+        # 구간별 명확한 색상
+        levels = np.linspace(vmin, vmax, int(n_levels) + 1)  # ✅ int() 추가
+        
+        cmap = plt.get_cmap(cmap_name)
+        im = ax.contourf(
+            results['Xi'], results['Yi'], Zi_masked,
+            levels=levels,
+            cmap=cmap,
+            extend='both'
+        )
+        
+        # 경계선 (선택적)
+        ax.contour(
+            results['Xi'], results['Yi'], Zi_masked,
+            levels=levels[::2],
+            colors='gray',
+            linewidths=0.5,
+            alpha=0.3
+        )
+    else:
+        # 연속적인 색상 (기존 방식)
+        cmap = plt.get_cmap(cmap_name).copy()
+        cmap.set_bad(alpha=0.0)
+        
+        im = ax.imshow(
+            Zi_masked,
+            extent=[-max_extent, max_extent, -max_extent, max_extent],
+            origin="lower", cmap=cmap,
+            vmin=vmin, vmax=vmax,
+            interpolation="bilinear"
+        )
     
     # 센서 위치
     ax.scatter(
         loc[valid, 0], loc[valid, 1],
         c=swc_values[valid], s=160, marker="o",
         edgecolors="red", linewidths=1.4,
-        cmap="Blues", vmin=0.15, vmax=0.40,
+        cmap=cmap_name, vmin=vmin, vmax=vmax,
         zorder=5
     )
     
@@ -57,11 +117,20 @@ def plot_panel_swc(analyzer, results, save_path, config):
     ax.plot(0, 0, "r+", markersize=18, markeredgewidth=3, zorder=6)
     
     # 제목
+    rbf_func = results.get('rbf_function', 'thin_plate')
+    rbf_smooth = results.get('rbf_smooth', 0.0)
+    
     title = f"Soil Moisture Distribution\n{results['date']}"
-    if config.interpolation.get('edge_control', False):
-        outside_fill = config.interpolation.get('outside_fill', 'nan')
-        hull_buffer = config.interpolation.get('hull_buffer_m', 0)
-        title += f"\n(edge: {outside_fill}, buffer={hull_buffer:.0f}m)"
+    title += f"\n({rbf_func}, smooth={rbf_smooth:.1f})"
+    
+    # Edge control 정보 추가
+    try:
+        if hasattr(config, 'interpolation') and config.interpolation.get('edge_control', False):
+            outside_fill = config.interpolation.get('outside_fill', 'nan')
+            hull_buffer = config.interpolation.get('hull_buffer_m', 0)
+            title += f", edge: {outside_fill}, buffer={hull_buffer:.0f}m"
+    except:
+        pass
     
     setup_base_axes(ax, max_extent, title)
     

@@ -9,20 +9,16 @@ site:
   
   # 추가 메타데이터
   location:
-    latitude: 38.79698
-    longitude: 110.35963
+    latitude: null
+    longitude: null
   
   soil_info:
     texture: "Sandy loam"  # 추정 (데이터 확인 필요)
     organic_matter: 0.22  # g/kg
 
-# HC 관측소 특화 설정
 analysis:
-  # HC는 기본값 사용
   max_extent: 150
   
-
-
 # 날짜 범위 (HC 데이터 기준)
 dates:
   calibration:
@@ -31,3 +27,13 @@ dates:
     - "2024-08-16"
     - "2024-09-20"
     - "2024-10-20"
+
+interpolation:
+  rbf_function: "thin_plate"  # "thin_plate" or "multiquadric"
+  rbf_smooth: 0.1             # or 0.1
+
+plotting:
+  panel_swc:
+    use_discrete_colors: true
+    n_levels: 12
+    cmap_name: "Blues"

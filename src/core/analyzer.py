@@ -224,7 +224,9 @@ class CRNPAnalyzer:
     def analyze_single_day(self, date_str, base_veg_height=0.3,
                           max_extent=None, resolution=None, ddeg=30,
                           use_pressure=True, P0=1013.25, alpha_p=1.0,
-                          bulk_density=None):
+                          bulk_density=None,
+                          rbf_function=None,
+                          rbf_smooth=None):
         """
         단일 날짜 분석
         
@@ -259,7 +261,9 @@ class CRNPAnalyzer:
             swc_values,
             valid_mask,
             max_extent=max_extent,
-            resolution=resolution
+            resolution=resolution,
+            rbf_function=rbf_function,
+            rbf_smooth=rbf_smooth 
         )
         
         # 식생 높이
@@ -334,4 +338,7 @@ class CRNPAnalyzer:
             "depth_profile": depth_profile,
             "bulk_density": bulk_density,
             "kernel_norm": kernel_norm,
+            "sensor_locations": self.get_sensor_locations(),
+            "rbf_function": rbf_function or self.config.interpolation.get('rbf_function', 'thin_plate'),
+            "rbf_smooth": rbf_smooth or self.config.interpolation.get('rbf_smooth', 0.0),
         }
