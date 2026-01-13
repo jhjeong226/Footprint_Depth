@@ -16,7 +16,7 @@ __all__ = [
 ]
 
 
-def save_all_panels(analyzer, results, out_dir, config, prefix="crnp"):
+def save_all_panels(config, analyzer, results, out_dir, prefix="crnp"):
     """
     모든 패널 저장
     

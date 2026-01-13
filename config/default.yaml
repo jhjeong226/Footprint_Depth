@@ -42,9 +42,8 @@ interpolation:
   method: "rbf"
   rbf_function: "thin_plate"
   rbf_smooth: 0
-  
   edge_control: true
-  hull_buffer_m: 15.0
+  hull_buffer_m: 1500.0
   outside_fill: "nan"
   
   # clip_min: 0.05

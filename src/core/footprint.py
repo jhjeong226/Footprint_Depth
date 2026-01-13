@@ -2,16 +2,27 @@
 CRNP Footprint 계산
 """
 import numpy as np
+from .physics import CRNPPhysics
 
 class FootprintCalculator:
     """Footprint 계산 클래스"""
     
-    def __init__(self, physics):
+    def __init__(self, config, physics=None):
         """
         Args:
-            physics: CRNPPhysics 객체
+            config: Config 객체
+            physics: CRNPPhysics 객체 (optional, 없으면 새로 생성)
         """
-        self.physics = physics
+        self.config = config
+        
+        # physics 객체 공유 또는 생성
+        if physics is not None:
+            self.physics = physics
+        else:
+            self.physics = CRNPPhysics(config)
+        
+        # 설정 읽기
+        self.analysis_config = config.analysis
     
     def calculate_R86_radial(self, Xi, Yi, contribution, target=0.86):
         """

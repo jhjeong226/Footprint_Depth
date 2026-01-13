@@ -205,7 +205,7 @@ class CRNPAnalyzer:
         fveg = self.physics.vegetation_correction_factor(theta, Hveg)
         
         # 중성자-토양수분 관계
-        N0 = self.config.physics['N0']
+        N0 = self.config.physics['neutron_moisture']['N0']
         params = self.config.physics['neutron_moisture']
         p1, p2 = params['p1'], params['p2']
         N_theta = N0 * (p1 + p2 * theta) / (p1 + theta)

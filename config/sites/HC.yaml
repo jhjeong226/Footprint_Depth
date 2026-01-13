@@ -21,10 +21,7 @@ analysis:
   # HC는 기본값 사용
   max_extent: 150
   
-interpolation:
-  # HC 특화 clip 범위 (필요시 활성화)
-  # clip_min: 0.05
-  # clip_max: 0.40
+
 
 # 날짜 범위 (HC 데이터 기준)
 dates:

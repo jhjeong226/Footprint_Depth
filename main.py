@@ -2,8 +2,11 @@
 CRNP Footprint Analysis Main Script
 """
 import os
+import sys
+import numpy as np
+
 from src.config import Config
-from src.core.analyzer import CRNPAnalyzer
+from src.core import CRNPAnalyzer
 from src.plotting import save_all_panels
 
 def print_header():
@@ -57,15 +60,16 @@ def print_results_summary(results):
 
 def main():
     """Main analysis workflow"""
-    import numpy as np
+    # import numpy as np  ← 제거! (상단에 이미 있음)
     
     print_header()
     
     # [Step 1] Load configuration
     print("\n[Step 1] Loading configuration...")
     config = Config()
-    config.load_site('HC')  # 또는 'PC'
+    config.load_site('HC')
     
+    print(f"✓ Loaded site config: {config.site['name']}")
     print(f"✓ Site: {config.site['name']}")
     print(f"✓ Bulk density: {config.site['bulk_density']} g/cm³")
     print(f"✓ Input files:")
@@ -76,21 +80,10 @@ def main():
     # [Step 2] Initialize analyzer
     print("\n[Step 2] Initializing analyzer...")
     
-    # ===== 경로 구성 =====
-    geo_path = os.path.join(
-        config.paths['input_root'],
-        config.paths['geo_file']
-    )
-    swc_path = os.path.join(
-        config.paths['input_root'],
-        config.paths['swc_file']
-    )
-    pressure_path = os.path.join(
-        config.paths['input_root'],
-        config.paths['pressure_file']
-    )
+    geo_path = os.path.join(config.paths['input_root'], config.paths['geo_file'])
+    swc_path = os.path.join(config.paths['input_root'], config.paths['swc_file'])
+    pressure_path = os.path.join(config.paths['input_root'], config.paths['pressure_file'])
     
-    # ===== Analyzer 초기화 =====
     analyzer = CRNPAnalyzer(
         config=config,
         geo_path=geo_path,
@@ -98,20 +91,20 @@ def main():
         pressure_path=pressure_path
     )
     
-    print(f"✓ Loaded {len(analyzer.sensor_ids)} sensors")
-    print(f"✓ Date range: {analyzer.swc_df['Date'].min()} to {analyzer.swc_df['Date'].max()}")
-    print(f"✓ CRNP center: ({analyzer.crnp_lat:.6f}, {analyzer.crnp_lon:.6f})")
-    if analyzer.pressure_daily is not None:
-        print(f"✓ Pressure series loaded: {len(analyzer.pressure_daily)} daily values")
-    
     # [Step 3] Analyze dates
-    analysis_dates = config.site.get('analysis_dates', [])
+    analysis_dates = config.site.get('dates', {}).get('analysis', [])
     if not analysis_dates:
         analysis_dates = ['2024-08-16', '2024-09-20', '2024-10-26']
     
     print(f"\n[Step 3] Analysis dates: {analysis_dates}")
     
+    output_dir = config.paths['output_plots']
+    
     for date_str in analysis_dates:
+        print(f"\n{'='*70}")
+        print(f"Analyzing {date_str}...")
+        print(f"{'='*70}\n")
+        
         try:
             results = analyzer.analyze_single_day(
                 date_str=date_str,
@@ -125,22 +118,18 @@ def main():
                 bulk_density=config.site.get('bulk_density', 1.4)
             )
             
-            # Print summary
             print_results_summary(results)
             
-            # Save plots
-            output_dir = config.paths['output_plots']
-            save_all_panels(analyzer, results, output_dir, prefix="crnp")
+            save_all_panels(config, analyzer, results, output_dir, prefix="crnp")
             
         except Exception as e:
             print(f"✗ Error analyzing {date_str}: {e}")
             import traceback
             traceback.print_exc()
     
-    # [Step 4] Summary
     print(f"\n{'='*70}")
     print("Analysis completed!")
-    print(f"Output directory: {config.paths['output_plots']}")
+    print(f"Output directory: {output_dir}")
     print(f"Total panels per date: 5")
     print(f"  - Panel 01: SWC distribution")
     print(f"  - Panel 02: Vegetation map")
