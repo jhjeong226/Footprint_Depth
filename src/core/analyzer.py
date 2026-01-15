@@ -83,16 +83,20 @@ class CRNPAnalyzer:
         if len(self.sensor_ids) == 0:
             raise ValueError("No sensor columns found in SWC file.")
         
-        # Pressure 데이터 로드 (optional)
+        # Pressure 및 Humidity 데이터 로드 (optional)
         self.pressure_daily = None
+        self.humidity_daily = None
         if pressure_path is not None and os.path.exists(pressure_path):
-            self.pressure_daily = self.load_pressure_daily(pressure_path)
-        
-        print(f"✓ Loaded {len(self.sensor_ids)} sensors")
-        print(f"✓ Date range: {self.swc_df['Date'].min()} to {self.swc_df['Date'].max()}")
-        print(f"✓ CRNP center: ({self.crnp_lat:.6f}, {self.crnp_lon:.6f})")
+            self.pressure_daily, self.humidity_daily = self.load_climate_daily(pressure_path)
+
+        print(f"[OK] Loaded {len(self.sensor_ids)} sensors")
+        print(f"[OK] Date range: {self.swc_df['Date'].min()} to {self.swc_df['Date'].max()}")
+        print(f"[OK] CRNP center: ({self.crnp_lat:.6f}, {self.crnp_lon:.6f})")
         if self.pressure_daily is not None:
-            print(f"✓ Pressure series loaded: {len(self.pressure_daily)} daily values")
+            print(f"[OK] Climate series loaded: {len(self.pressure_daily)} daily values")
+            print(f"  - Pressure (hPa)")
+            if self.humidity_daily is not None:
+                print(f"  - Absolute humidity (g/m3)")
     
     def calculate_relative_coordinates(self):
         """CRNP 중심 기준 상대 좌표 계산"""
@@ -106,30 +110,90 @@ class CRNPAnalyzer:
         """센서 위치 반환"""
         return self.geo_df[["x", "y"]].to_numpy(dtype=float)
     
-    def load_pressure_daily(self, pressure_path):
-        """일별 기압 데이터 로드"""
-        df = pd.read_excel(pressure_path, header=1)
-        
+    @staticmethod
+    def calculate_absolute_humidity(temp_c, rh_percent):
+        """
+        절대습도 계산 (g/m³)
+
+        Args:
+            temp_c: 온도 (°C)
+            rh_percent: 상대습도 (%)
+
+        Returns:
+            절대습도 (g/m³)
+        """
+        # Magnus 공식으로 포화수증기압 계산 (hPa)
+        es = 6.112 * np.exp((17.67 * temp_c) / (temp_c + 243.5))
+
+        # 실제 수증기압 (hPa)
+        e = es * (rh_percent / 100.0)
+
+        # 절대습도 (g/m³)
+        # AH = (e × 100) / ((T + 273.15) × 0.4615)
+        # 여기서 e는 hPa, T는 °C
+        abs_humidity = (e * 100.0) / ((temp_c + 273.15) * 0.4615)
+
+        return abs_humidity
+
+    def load_climate_daily(self, climate_path):
+        """
+        일별 기후 데이터 로드 (기압, 절대습도)
+
+        Args:
+            climate_path: 기후 데이터 파일 경로
+
+        Returns:
+            pressure_daily: 일별 기압 (hPa)
+            humidity_daily: 일별 절대습도 (g/m³)
+        """
+        df = pd.read_excel(climate_path, header=1)
+
         if "TIMESTAMP" not in df.columns:
-            raise ValueError("Pressure file must have 'TIMESTAMP' column.")
-        
+            raise ValueError("Climate file must have 'TIMESTAMP' column.")
+
+        # 기압 컬럼 찾기
         if "Air_Press_Avg" not in df.columns:
             if df.shape[1] < 5:
                 raise ValueError("Cannot locate pressure column.")
             pressure_col = df.columns[4]
         else:
             pressure_col = "Air_Press_Avg"
-        
+
+        # 온도 및 습도 컬럼 확인
+        temp_col = "Air_Temp_Avg" if "Air_Temp_Avg" in df.columns else None
+        rh_col = "RH_Avg" if "RH_Avg" in df.columns else None
+
+        # 타임스탬프 처리
         df["TIMESTAMP"] = pd.to_datetime(df["TIMESTAMP"], errors="coerce")
         df = df.dropna(subset=["TIMESTAMP"]).copy()
-        
+
+        # 기압 데이터 처리
         df[pressure_col] = pd.to_numeric(df[pressure_col], errors="coerce")
-        df = df.dropna(subset=[pressure_col]).copy()
-        
+
+        # 절대습도 계산 (온도와 상대습도가 있을 경우)
+        humidity_daily = None
+        if temp_col and rh_col:
+            df[temp_col] = pd.to_numeric(df[temp_col], errors="coerce")
+            df[rh_col] = pd.to_numeric(df[rh_col], errors="coerce")
+
+            # 절대습도 계산
+            valid_mask = df[temp_col].notna() & df[rh_col].notna()
+            df.loc[valid_mask, "abs_humidity"] = df.loc[valid_mask].apply(
+                lambda row: self.calculate_absolute_humidity(row[temp_col], row[rh_col]),
+                axis=1
+            )
+
+            # 일별 평균
+            df["date"] = df["TIMESTAMP"].dt.normalize()
+            humidity_daily = df.groupby("date")["abs_humidity"].mean().sort_index()
+            humidity_daily.name = "abs_humidity_gm3"
+
+        # 기압 일별 평균
         df["date"] = df["TIMESTAMP"].dt.normalize()
-        daily = df.groupby("date")[pressure_col].mean().sort_index()
-        daily.name = "pressure_hpa"
-        return daily
+        pressure_daily = df.groupby("date")[pressure_col].mean().sort_index()
+        pressure_daily.name = "pressure_hpa"
+
+        return pressure_daily, humidity_daily
     
     def get_daily_pressure(self, date_str):
         """특정 날짜 기압 가져오기"""
@@ -138,6 +202,15 @@ class CRNPAnalyzer:
         d = pd.to_datetime(date_str).normalize()
         if d in self.pressure_daily.index:
             return float(self.pressure_daily.loc[d])
+        return None
+
+    def get_daily_humidity(self, date_str):
+        """특정 날짜 절대습도 가져오기"""
+        if self.humidity_daily is None:
+            return None
+        d = pd.to_datetime(date_str).normalize()
+        if d in self.humidity_daily.index:
+            return float(self.humidity_daily.loc[d])
         return None
     
     def get_daily_swc(self, date_str):
@@ -166,11 +239,24 @@ class CRNPAnalyzer:
         return max(0.05, float(h))
     
     def compute_contribution(self, Xi, Yi, swc_map, height, max_extent=170,
-                            pressure_hpa=None, use_pressure=True, 
-                            P0=1013.25, alpha_p=1.0):
+                            pressure_hpa=None, use_pressure=True,
+                            P0=1013.25, alpha_p=1.0, abs_humidity=None,
+                            bulk_density=1.4):
         """
         Footprint (contribution) 계산
-        
+
+        Args:
+            Xi, Yi: 그리드 좌표
+            swc_map: 토양수분 맵
+            height: 식생 높이
+            max_extent: 최대 범위
+            pressure_hpa: 기압 (hPa)
+            use_pressure: 기압 보정 사용 여부
+            P0: 표준 기압
+            alpha_p: 기압 스케일링 지수
+            abs_humidity: 절대습도 (g/m³)
+            bulk_density: 토양 밀도 (g/cm³)
+
         Returns:
             C: Contribution map
             sP: Pressure scale factor
@@ -178,20 +264,23 @@ class CRNPAnalyzer:
         """
         R = np.sqrt(Xi**2 + Yi**2)
         mask_r = R <= max_extent
-        
+
         # Pressure scaling
         if (not use_pressure) or (pressure_hpa is None) or (not np.isfinite(pressure_hpa)):
             sP = 1.0
         else:
             sP = (float(pressure_hpa) / float(P0)) ** float(alpha_p)
-        
+
         R_eff = R * sP
-        
+
         theta = swc_map
         Hveg = float(height)
-        
-        # 수평 가중 함수
-        Wr = self.physics.radial_intensity_function(R_eff, theta=theta)
+
+        # 절대습도 (abs_humidity가 None이면 기본값 사용)
+        h = abs_humidity if abs_humidity is not None else 5.0
+
+        # 수평 가중 함수 (토양수분 의존성 포함!)
+        Wr = self.physics.radial_intensity_function(R_eff, h=h, theta=theta, bulk_density=bulk_density)
         
         # 순수 커널 (vegetation/soil moisture 제외)
         K = np.zeros_like(R, dtype=float)
@@ -207,8 +296,13 @@ class CRNPAnalyzer:
         # 중성자-토양수분 관계
         N0 = self.config.physics['neutron_moisture']['N0']
         params = self.config.physics['neutron_moisture']
-        p1, p2 = params['p1'], params['p2']
-        N_theta = N0 * (p1 + p2 * theta) / (p1 + theta)
+        p1, p2, p3, p4, p5, p6, p7, p8 = params['p1'], params['p2'], params['p3'], params['p4'], params['p5'], params['p6'], params['p7'], params['p8']
+
+        # h는 이미 위에서 정의됨 (abs_humidity 또는 기본값 5.0)
+        N_theta = N0 * (
+            (p1 + p2*theta) / (p1 + theta) * (p3 + p4*h + p5*h**2) +
+            np.exp(-p6*theta) * (p7 + p8*h)
+        )
         
         # 최종 기여도
         mask = mask_r & np.isfinite(theta) & np.isfinite(N_theta)
@@ -270,10 +364,13 @@ class CRNPAnalyzer:
         date = pd.to_datetime(date_str)
         doy = date.timetuple().tm_yday
         veg_height = self.estimate_vegetation_height(doy, base_veg_height)
-        
+
         # 기압
         pressure_hpa = self.get_daily_pressure(date_str) if use_pressure else None
-        
+
+        # 절대습도
+        abs_humidity = self.get_daily_humidity(date_str)
+
         # Contribution 계산
         contribution, sP, kernel_norm = self.compute_contribution(
             Xi, Yi, swc_map, veg_height,
@@ -281,17 +378,29 @@ class CRNPAnalyzer:
             pressure_hpa=pressure_hpa,
             use_pressure=use_pressure,
             P0=P0,
-            alpha_p=alpha_p
+            alpha_p=alpha_p,
+            abs_humidity=abs_humidity,
+            bulk_density=bulk_density
         )
         
         # Predicted SWC
         predicted_swc = float(np.nansum(contribution * swc_map))
         
-        # R86 계산
+        # R86 계산 (그리드 기반 - max_extent 의존)
         R86_radius, R86_cum = self.footprint_calc.calculate_R86_radial(
             Xi, Yi, contribution, target=0.86
         )
-        
+
+        # 해석적 R86 계산 (max_extent와 독립적)
+        h_for_R86 = abs_humidity if abs_humidity is not None else 5.0
+        R86_analytical = self.footprint_calc.calculate_analytical_R86(
+            theta=predicted_swc,
+            bulk_density=bulk_density,
+            h=h_for_R86,
+            target=0.86,
+            r_max=500
+        )
+
         # 방향별 R86
         sectors = self.footprint_calc.directional_Rp_by_sector(
             Xi, Yi, contribution, p=0.86, ddeg=ddeg, min_sector_mass=1e-4
@@ -319,6 +428,7 @@ class CRNPAnalyzer:
             "veg_height": veg_height,
             "pressure_hpa": pressure_hpa,
             "pressure_scale_sP": sP,
+            "abs_humidity": abs_humidity,
             "Xi": Xi,
             "Yi": Yi,
             "swc_map": swc_map,
@@ -330,6 +440,7 @@ class CRNPAnalyzer:
             "n_valid_sensors": int(np.sum(valid_mask)),
             "R86_radius": R86_radius,
             "R86_cum": R86_cum,
+            "R86_analytical": R86_analytical,
             "ddeg": ddeg,
             "R86_phi_sectors": sectors,
             "use_pressure": use_pressure,

@@ -1,24 +1,102 @@
-# HC Site Configuration
-# Overrides default.yaml settings
+# =============================================================================
+# HC Site Configuration (Complete - Independent from default.yaml)
+# =============================================================================
 
+project:
+  name: "CRNP Footprint Analysis"
+  version: "2.0.0"
+  base_path: "E:/02.Data/05.CRNP/02.UTS_system/98.Code_test/01.FootprintRadius/Footprint_Depth"
+
+# HC 사이트 정보
 site:
   name: "HC"
   description: "HC observation site"
-  bulk_density: 1.22  # g/cm³ (사용자 코드에서 확인된 값)
-  field_capacity: 0.28  # 추정값 (조정 필요)
-  
+  bulk_density: 1.22  # g/cm³
+  field_capacity: 0.28
+
   # 추가 메타데이터
   location:
     latitude: null
     longitude: null
-  
+
   soil_info:
-    texture: "Sandy loam"  # 추정 (데이터 확인 필요)
+    texture: "Sandy loam"
     organic_matter: 0.22  # g/kg
 
+# ===== 경로 설정 =====
+paths:
+  # 기본 경로들
+  data_root: "{base_path}/data"
+  input_root: "{data_root}/input/{site_name}"
+  output_root: "{data_root}/output/{site_name}"
+  output_plots: "{output_root}/plots"
+  output_results: "{output_root}/results"
+  output_diagnostics: "{output_root}/diagnostics"
+
+  # 입력 파일명
+  geo_file: "geo_locations.xlsx"
+  swc_file: "{site_name}_FDR_daily_depths.xlsx"
+  pressure_file: "{site_name}_CRNP_Input.xlsx"
+
+# 분석 설정
 analysis:
-  max_extent: 150
-  
+  max_extent: 200
+  resolution: 10
+  sector_degrees: 30
+
+  use_pressure: true
+  base_veg_height: 0.3
+
+# 토양수분 내삽
+interpolation:
+  method: "rbf"
+  rbf_function: "thin_plate"
+  rbf_smooth: 0.1
+  edge_control: true
+  hull_buffer_m: 300.0
+  outside_fill: "nan"
+
+# 물리 파라미터
+physics:
+  # 기압 보정
+  pressure:
+    P0: 1013.25
+    alpha_p: 1.0
+
+  # N(θ) 관계식 (Köhli 2021) - HC Site
+  neutron_moisture:
+    N0: 1753  # HC 사이트 고유값
+    p1: 0.0226
+    p2: 0.207
+    p3: 1.024
+    p4: -0.0093
+    p5: 0.000074
+    p6: 1.625
+    p7: 0.235
+    p8: -0.0029
+
+  # 깊이 가중 함수 (Wang 2023)
+  depth_weighting:
+    p0: 8.321
+    p1: 0.14249
+    p2: 0.86655
+    p3: 26.42
+    p4: 0.0567
+
+  # 수평 가중 함수 - Schrön et al. (2023) Equation (2)
+  radial_weighting:
+    a1: 30.0    # 근거리 가중치
+    b1: 1.6     # 근거리 감쇠 스케일 (m)
+    a2: 1.0     # 원거리 가중치
+    b2: 100.0   # 원거리 감쇠 스케일 (m)
+    c: 3.7      # 근거리 억제 계수
+
+  # 식생 영향
+  vegetation:
+    c1: 0.17
+    c2: 0.41
+    c3: 7.0
+
 # 날짜 범위 (HC 데이터 기준)
 dates:
   calibration:
@@ -28,12 +106,50 @@ dates:
     - "2024-09-20"
     - "2024-10-20"
 
-interpolation:
-  rbf_function: "thin_plate"  # "thin_plate" or "multiquadric"
-  rbf_smooth: 0.1             # or 0.1
-
+# 플롯 설정
 plotting:
+  global:
+    dpi: 300
+    format: "png"
+    font_size: 10
+
   panel_swc:
+    figsize: [7.8, 6.5]
+    cmap: "Blues"
+    vmin: 0.15
+    vmax: 0.40
+    marker_size: 160
     use_discrete_colors: true
     n_levels: 12
     cmap_name: "Blues"
+
+  panel_veg:
+    figsize: [7.8, 6.5]
+    cmap: "YlGn"
+    vmin: 0.0
+    vmax: 0.5
+
+  panel_contrib:
+    figsize: [8.8, 7.2]
+    cmap: "hot"
+    norm_mode: "log"
+    mass_level: 0.86
+    contour_color: "red"
+    contour_linewidth: 3.0
+    show_sector_rays: true
+
+  panel_depth:
+    figsize: [8, 6]
+    colors:
+      - '#1f77b4'
+      - '#ff7f0e'
+      - '#2ca02c'
+      - '#d62728'
+    alpha: 0.7
+
+  panel_xsection:
+    figsize: [20, 9]
+    bg_threshold: 0.0005
+    gamma: 0.45
+    n_levels: 6
+    cmap: "hot_r"

@@ -25,7 +25,7 @@ paths:
   
   # 입력 파일명 (평탄화!)
   geo_file: "geo_locations.xlsx"
-  swc_file: "{site_name}_FDR_daily_depths.xlsx"
+  swc_file: "{site_name}_FDR_daily_depths_test.xlsx"
   pressure_file: "{site_name}_CRNP_Input.xlsx"
 
 # 분석 설정
@@ -76,13 +76,13 @@ physics:
     p3: 26.42
     p4: 0.0567
   
-  # 수평 가중 함수 (Schrön 2017)
+  # 수평 가중 함수 - Schrön et al. (2023) Equation (2)
   radial_weighting:
-    a1: 30.0
-    b1: 1.6
-    a2: 1.0
-    b2: 100.0
-    c: 3.7
+    a1: 30.0    # 근거리 가중치
+    b1: 1.6     # 근거리 감쇠 스케일 (m)
+    a2: 1.0     # 원거리 가중치
+    b2: 100.0   # 원거리 감쇠 스케일 (m)
+    c: 3.7      # 근거리 억제 계수
   
   # 식생 영향
   vegetation:

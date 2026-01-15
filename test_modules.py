@@ -51,19 +51,13 @@ def test_config():
     
     try:
         from src.config import Config
-        
-        # Default config
-        config = Config()
-        print(f"✓ Default config loaded")
+
+        # HC config (직접 로드)
+        config = Config('HC')
+        print(f"✓ HC config loaded")
         print(f"  Site: {config.site['name']}")
         print(f"  Bulk density: {config.site['bulk_density']}")
-        
-        # HC config
-        config.load_site('HC')
-        print(f"\n✓ HC config loaded")
-        print(f"  Site: {config.site['name']}")
-        print(f"  Bulk density: {config.site['bulk_density']}")
-        print(f"  Analysis dates: {config.site.get('analysis_dates', [])}")
+        print(f"  Analysis dates: {config.site.get('dates', {}).get('analysis', [])}")
         
         # 경로 확인
         print(f"\n✓ Paths:")
@@ -90,8 +84,8 @@ def test_physics():
         from src.config import Config
         from src.core import CRNPPhysics
         import numpy as np
-        
-        config = Config()
+
+        config = Config('HC')
         physics = CRNPPhysics(config)
         
         # Wr 테스트

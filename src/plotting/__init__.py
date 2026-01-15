@@ -74,7 +74,7 @@ def save_all_panels(config, analyzer, results, out_dir, prefix="crnp"):
         gamma=0.45
     )
     
-    print(f"✓ Saved 5 panels to: {out_dir}")
+    print(f"[OK] Saved 5 panels to: {out_dir}")
     print(f"  01: SWC distribution map")
     print(f"  02: Vegetation height map")
     print(f"  03: Footprint contribution with R86(φ) boundary")

@@ -27,21 +27,13 @@ def test_hc_config_debug():
     print("="*70)
     
     try:
-        # 1. 기본 설정 로드
-        config = Config()
-        
-        print(f"\n[Step 1] Default config loaded")
+        # HC 사이트 직접 로드 (default.yaml 사용 안 함)
+        print(f"\n[Step 1] Loading HC site...")
+        config = Config('HC')
+
+        print(f"\n[Step 2] HC config loaded")
         print(f"  Site name: {config.site['name']}")
         print(f"  Input root: {config.paths['input_root']}")
-        
-        # 2. HC 사이트 로드
-        print(f"\n[Step 2] Loading HC site...")
-        config.load_site('HC')
-        
-        print(f"\n[Step 3] After HC loaded")
-        print(f"  Site name: {config.site['name']}")
-        print(f"  Input root: {config.paths['input_root']}")
-        print(f"  GEO file: {config.paths['input']['geo']}")
         
         # 3. 파일 존재 확인
         print(f"\n[Step 4] File check:")

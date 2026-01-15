@@ -26,31 +26,55 @@ class FootprintCalculator:
     
     def calculate_R86_radial(self, Xi, Yi, contribution, target=0.86):
         """
-        방사형 R86 계산
-        
+        방사형 R86 계산 (그리드 기반 - max_extent에 의존)
+
         Args:
             Xi, Yi: 그리드 좌표
             contribution: 기여도 맵
             target: 목표 누적 기여도 (0.86 = 86%)
-        
+
         Returns:
             R86_radius: R86 반경
             R86_cum: 실제 누적 기여도
         """
         R = np.sqrt(Xi**2 + Yi**2).ravel()
         C = contribution.ravel()
-        
+
         order = np.argsort(R)
         R_sorted = R[order]
         C_sorted = C[order]
-        
+
         cs = np.cumsum(C_sorted)
         idx = np.searchsorted(cs, target)
-        
+
         if idx >= len(R_sorted):
             return np.nan, np.nan
-        
+
         return float(R_sorted[idx]), float(cs[idx])
+
+    def calculate_analytical_R86(self, theta, bulk_density=1.4, h=5.0,
+                                  target=0.86, r_max=500):
+        """
+        해석적 R86 계산 (max_extent와 독립적)
+
+        Args:
+            theta: 대표 토양 수분 (footprint-weighted average)
+            bulk_density: 토양 밀도 (g/cm³)
+            h: 공기 습도 (g/m³)
+            target: 목표 누적 기여도 (0.86)
+            r_max: 적분 최대 반경 (m)
+
+        Returns:
+            R86: 해석적 R86 반경 (m)
+        """
+        R86, _ = self.physics.calculate_analytical_R86(
+            theta=theta,
+            bulk_density=bulk_density,
+            h=h,
+            target=target,
+            r_max=r_max
+        )
+        return R86
     
     def directional_Rp_by_sector(self, Xi, Yi, contribution, 
                                  p=0.86, ddeg=30, min_sector_mass=1e-4):

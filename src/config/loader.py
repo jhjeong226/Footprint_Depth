@@ -7,10 +7,11 @@ import copy
 
 class Config:
     """Configuration management class"""
-    
-    def __init__(self, config_dir=None):
+
+    def __init__(self, site_name, config_dir=None):
         """
         Args:
+            site_name: 사이트 이름 (예: 'HC', 'PC') - 필수!
             config_dir: config 디렉토리 경로 (None이면 자동 탐색)
         """
         # Config 디렉토리 찾기
@@ -21,19 +22,26 @@ class Config:
             src_dir = os.path.dirname(src_config_dir)
             project_root = os.path.dirname(src_dir)
             config_dir = os.path.join(project_root, 'config')
-        
+
         self.config_dir = config_dir
-        self.default_config_path = os.path.join(config_dir, 'default.yaml')
         self.sites_dir = os.path.join(config_dir, 'sites')
-        
-        # 설정 로드
-        self._config = self._load_yaml(self.default_config_path)
-        
+
+        # 사이트별 설정 직접 로드 (default.yaml 사용 안 함)
+        site_config_path = os.path.join(self.sites_dir, f'{site_name}.yaml')
+
+        if not os.path.exists(site_config_path):
+            raise FileNotFoundError(f"Site config not found: {site_config_path}")
+
+        # 사이트 설정 로드
+        self._config = self._load_yaml(site_config_path)
+
         # Path templates 보존 (동적 site 변경을 위해)
         self._path_templates = copy.deepcopy(self._config.get('paths', {}))
-        
+
         # 초기 변수 치환
         self._resolve_variables()
+
+        print(f"[OK] Loaded site config: {site_name}")
     
     def _load_yaml(self, filepath):
         """YAML 파일 로드"""
@@ -99,26 +107,26 @@ class Config:
     
     def load_site(self, site_name):
         """
-        사이트별 설정 로드
-        
+        사이트별 설정 로드 (다른 사이트로 변경)
+
         Args:
             site_name: 사이트 이름 (예: 'HC', 'PC')
         """
         site_config_path = os.path.join(self.sites_dir, f'{site_name}.yaml')
-        
+
         if not os.path.exists(site_config_path):
             raise FileNotFoundError(f"Site config not found: {site_config_path}")
-        
-        # 사이트 설정 로드
-        site_config = self._load_yaml(site_config_path)
-        
-        # 기본 설정과 병합
-        self._config = self._deep_merge(self._config, site_config)
-        
+
+        # 사이트 설정 직접 로드 (default.yaml과 병합하지 않음)
+        self._config = self._load_yaml(site_config_path)
+
+        # Path templates 갱신
+        self._path_templates = copy.deepcopy(self._config.get('paths', {}))
+
         # 경로 재계산 (site_name이 바뀌었으므로)
         self._resolve_variables()
-        
-        print(f"✓ Loaded site config: {site_name}")
+
+        print(f"[OK] Loaded site config: {site_name}")
     
     # ===== 속성 접근자 =====
     
