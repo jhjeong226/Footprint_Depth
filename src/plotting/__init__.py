@@ -69,9 +69,7 @@ def save_all_panels(config, analyzer, results, out_dir, prefix="crnp"):
     plot_panel_footprint_crosssection(
         results,
         os.path.join(out_dir, f"{prefix}_{d}_05_crosssection.png"),
-        config,
-        bg_threshold=0.0005,
-        gamma=0.45
+        config
     )
     
     print(f"[OK] Saved 5 panels to: {out_dir}")

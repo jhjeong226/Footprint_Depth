@@ -34,11 +34,11 @@ def plot_panel_depth_layers(results, save_path, config):
                 va='center', fontsize=12, fontweight='bold')
     
     # 축 설정
-    ax.set_xlabel('Contribution (%)', fontsize=14, fontweight='bold')
-    ax.set_ylabel('Depth Layer', fontsize=14, fontweight='bold')
+    ax.set_xlabel('Contribution (%)', fontsize=13, fontweight='bold')
+    ax.set_ylabel('Depth Layer', fontsize=13, fontweight='bold')
     ax.set_title(
-        f"Vertical Layer Contributions\n{results['date']}\nD₈₆ = {dp['D86']:.1f} cm",
-        fontsize=16, fontweight='bold'
+        f"Vertical Layer Contributions | {results['date']}",
+        fontsize=14, fontweight='bold'
     )
     ax.grid(True, alpha=0.3, axis='x')
     ax.set_xlim(0, max(contributions) * 1.15)

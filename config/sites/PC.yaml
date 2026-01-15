@@ -35,13 +35,13 @@ paths:
 
   # 입력 파일명
   geo_file: "geo_locations.xlsx"
-  swc_file: "{site_name}_FDR_daily_depths_test.xlsx"
+  swc_file: "{site_name}_FDR_daily_depths.xlsx"
   pressure_file: "{site_name}_CRNP_Input.xlsx"
 
 # 분석 설정
 analysis:
-  max_extent: 170
-  resolution: 10
+  max_extent: 200
+  resolution: 1
   sector_degrees: 30
 
   use_pressure: true
@@ -50,11 +50,11 @@ analysis:
 # 토양수분 내삽
 interpolation:
   method: "rbf"
-  rbf_function: "thin_plate"
-  rbf_smooth: 0.1
-  edge_control: true
-  hull_buffer_m: 200.0
-  outside_fill: "nan"
+  rbf_function: "multiquadric" # 변경 가능: thin_plate, multiquadric, inverse, gaussian 등
+  rbf_smooth: 0.0
+  edge_control: False
+  hull_buffer_m: 10.0
+  outside_fill: nearest
 
 # 물리 파라미터
 physics:

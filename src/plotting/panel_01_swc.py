@@ -34,11 +34,11 @@ def plot_panel_swc(analyzer, results, save_path, config,
     if n_levels is None:
         try:
             # Config에서 읽기 시도
-            n_levels = config.get('plotting.panel_swc.n_levels', 12)
+            n_levels = config.get('plotting.panel_swc.n_levels', 20)
             if n_levels is None:
-                n_levels = 12
+                n_levels = 20
         except:
-            n_levels = 12
+            n_levels = 20
     
     if cmap_name is None:
         try:
@@ -60,7 +60,7 @@ def plot_panel_swc(analyzer, results, save_path, config,
     Zi = results["swc_map"]
     Zi_masked = np.ma.masked_invalid(Zi)
     
-    vmin, vmax = 0.15, 0.40
+    vmin, vmax = 0.1, 0.5
     
     # Discrete 또는 continuous 색상 선택
     if use_discrete_colors:
@@ -99,39 +99,26 @@ def plot_panel_swc(analyzer, results, save_path, config,
     # 센서 위치
     ax.scatter(
         loc[valid, 0], loc[valid, 1],
-        c=swc_values[valid], s=160, marker="o",
-        edgecolors="red", linewidths=1.4,
+        c=swc_values[valid], s=60, marker="o",
+        edgecolors="red", linewidths=1.0,
         cmap=cmap_name, vmin=vmin, vmax=vmax,
         zorder=5
     )
-    
+
     # 결측 센서
     if np.any(~valid):
         ax.scatter(
             loc[~valid, 0], loc[~valid, 1],
-            s=160, marker="x", color="gray", linewidths=2,
+            s=60, marker="x", color="gray", linewidths=1.5,
             zorder=5
         )
-    
+
     # CRNP 위치
-    ax.plot(0, 0, "r+", markersize=18, markeredgewidth=3, zorder=6)
-    
-    # 제목
-    rbf_func = results.get('rbf_function', 'thin_plate')
-    rbf_smooth = results.get('rbf_smooth', 0.0)
-    
-    title = f"Soil Moisture Distribution\n{results['date']}"
-    title += f"\n({rbf_func}, smooth={rbf_smooth:.1f})"
-    
-    # Edge control 정보 추가
-    try:
-        if hasattr(config, 'interpolation') and config.interpolation.get('edge_control', False):
-            outside_fill = config.interpolation.get('outside_fill', 'nan')
-            hull_buffer = config.interpolation.get('hull_buffer_m', 0)
-            title += f", edge: {outside_fill}, buffer={hull_buffer:.0f}m"
-    except:
-        pass
-    
+    ax.plot(0, 0, "r+", markersize=12, markeredgewidth=2, zorder=6)
+
+    # 제목 (간소화)
+    title = f"Soil Moisture Distribution | {results['date']}"
+
     setup_base_axes(ax, max_extent, title)
     
     # Colorbar

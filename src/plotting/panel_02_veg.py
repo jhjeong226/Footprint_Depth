@@ -30,9 +30,9 @@ def plot_panel_veg(results, save_path, config):
     )
     
     # CRNP 위치
-    ax.plot(0, 0, "r+", markersize=18, markeredgewidth=3, zorder=6)
-    
-    title = f"Vegetation Height\n(DOY={results['doy']})"
+    ax.plot(0, 0, "r+", markersize=12, markeredgewidth=2, zorder=6)
+
+    title = f"Vegetation Height | {results['date']}"
     setup_base_axes(ax, max_extent, title)
     
     # Colorbar

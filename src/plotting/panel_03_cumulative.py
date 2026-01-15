@@ -110,27 +110,27 @@ def plot_panel_footprint_cumulative(results, save_path, config,
         if "sensor_locations" in results and "valid_mask" in results:
             loc = results["sensor_locations"]
             valid = results["valid_mask"]
-            
+
             # 유효한 센서 (검은 원)
             if np.any(valid):
                 ax.scatter(
                     loc[valid, 0], loc[valid, 1],
-                    s=120, marker="o",
+                    s=50, marker="o",
                     facecolors='black',
                     edgecolors='white',
-                    linewidths=1.5,
+                    linewidths=1.0,
                     alpha=0.85,
                     zorder=8,
                     label='Valid sensors'
                 )
-            
+
             # 결측 센서 (회색 X)
             if np.any(~valid):
                 ax.scatter(
                     loc[~valid, 0], loc[~valid, 1],
-                    s=120, marker="x",
+                    s=50, marker="x",
                     color="gray",
-                    linewidths=2.5,
+                    linewidths=1.5,
                     alpha=0.7,
                     zorder=8,
                     label='Missing sensors'
@@ -142,17 +142,13 @@ def plot_panel_footprint_cumulative(results, save_path, config,
                         linewidth=0.6, alpha=0.15, color="gray", zorder=2)
     
     # CRNP 위치
-    ax.plot(0, 0, "r+", markersize=20, markeredgewidth=3.5, zorder=9,
+    ax.plot(0, 0, "r+", markersize=12, markeredgewidth=2, zorder=9,
            label='CRNP station')
-    
-    # ========== 제목 ==========
-    title = f"CRNP Actual Observation Footprint\n{results['date']}"
-    if results.get("pressure_hpa") is not None:
-        title += f"\nP={results['pressure_hpa']:.1f} hPa, sP={results['pressure_scale_sP']:.3f}"
-    
-    title += f"\n\n🔴 Red contour: {mass_level:.0%} cumulative signal contribution"
-    
-    ax.set_title(title, fontsize=15, fontweight="bold", pad=15)
+
+    # ========== 제목 (간소화) ==========
+    title = f"CRNP Observation Footprint | {results['date']}"
+
+    ax.set_title(title, fontsize=14, fontweight="bold", pad=10)
     ax.set_xlabel("Distance (m)", fontsize=13, fontweight="bold")
     ax.set_ylabel("Distance (m)", fontsize=13, fontweight="bold")
     ax.grid(True, alpha=0.3, linestyle="--", color="gray", linewidth=0.8)

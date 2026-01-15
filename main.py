@@ -73,7 +73,7 @@ def main():
     
     # [Step 1] Load configuration
     print("\n[Step 1] Loading configuration...")
-    config = Config('HC')
+    config = Config('PC')
     
     print(f"[OK] Loaded site config: {config.site['name']}")
     print(f"[OK] Site: {config.site['name']}")
@@ -100,7 +100,7 @@ def main():
     # [Step 3] Analyze dates
     analysis_dates = config.site.get('dates', {}).get('analysis', [])
     if not analysis_dates:
-        analysis_dates = ['2025-08-08', '2025-08-09', '2025-08-10', '2025-08-11']
+        analysis_dates = ['2025-06-15','2025-07-14', '2025-07-20','2025-08-14']
     
     print(f"\n[Step 3] Analysis dates: {analysis_dates}")
     
