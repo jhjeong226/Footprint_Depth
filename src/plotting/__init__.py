@@ -6,6 +6,7 @@ from .panel_02_veg import plot_panel_veg
 from .panel_03_cumulative import plot_panel_footprint_cumulative
 from .panel_04_depth import plot_panel_depth_layers
 from .panel_05_xsection import plot_panel_footprint_crosssection
+from .panel_06_practical_footprint import plot_panel_practical_footprint
 
 __all__ = [
     'plot_panel_swc',
@@ -13,6 +14,7 @@ __all__ = [
     'plot_panel_footprint_amoeba',
     'plot_panel_depth_layers',
     'plot_panel_footprint_crosssection',
+    'plot_panel_practical_footprint',
 ]
 
 
@@ -72,9 +74,19 @@ def save_all_panels(config, analyzer, results, out_dir, prefix="crnp"):
         config
     )
     
-    print(f"[OK] Saved 5 panels to: {out_dir}")
+    # Panel 6: Practical footprint (Schrön 2023)
+    plot_panel_practical_footprint(
+        results,
+        os.path.join(out_dir, f"{prefix}_{d}_06_practical_footprint.png"),
+        config,
+        analyzer.sigcon,
+        h=results.get("abs_humidity") or 5.0
+    )
+
+    print(f"[OK] Saved 6 panels to: {out_dir}")
     print(f"  01: SWC distribution map")
     print(f"  02: Vegetation height map")
     print(f"  03: Footprint contribution with R86(φ) boundary")
     print(f"  04: Vertical depth layer contributions")
     print(f"  05: 2D Cross-section (Distance × Depth)")
+    print(f"  06: Practical footprint (R86 vs detectable distance)")

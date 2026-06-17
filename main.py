@@ -3,11 +3,35 @@ CRNP Footprint Analysis Main Script
 """
 import os
 import sys
+import argparse
+from datetime import date, timedelta
 import numpy as np
 
 from src.config import Config
 from src.core import CRNPAnalyzer
 from src.plotting import save_all_panels
+
+def resolve_dates(dates_config):
+    """YAML dates 블록에서 분석 날짜 목록 생성.
+    analysis(개별 날짜)와 range(기간)를 병합해 정렬된 고유 목록 반환.
+    """
+    result = set()
+
+    for d in dates_config.get('analysis', []):
+        result.add(str(d))
+
+    r = dates_config.get('range', {})
+    if r and r.get('start') and r.get('end'):
+        start = date.fromisoformat(str(r['start']))
+        end   = date.fromisoformat(str(r['end']))
+        step  = timedelta(days=int(r.get('step_days', 1)))
+        cur = start
+        while cur <= end:
+            result.add(cur.isoformat())
+            cur += step
+
+    return sorted(result)
+
 
 def print_header():
     """Print analysis header"""
@@ -72,8 +96,12 @@ def main():
     print_header()
     
     # [Step 1] Load configuration
+    parser = argparse.ArgumentParser(description="CRNP Footprint Analysis")
+    parser.add_argument("site", help="Site name (e.g. HC, PC)")
+    args = parser.parse_args()
+
     print("\n[Step 1] Loading configuration...")
-    config = Config('PC')
+    config = Config(args.site)
     
     print(f"[OK] Loaded site config: {config.site['name']}")
     print(f"[OK] Site: {config.site['name']}")
@@ -98,19 +126,20 @@ def main():
     )
     
     # [Step 3] Analyze dates
-    analysis_dates = config.site.get('dates', {}).get('analysis', [])
+    analysis_dates = resolve_dates(config.get('dates', {}))
     if not analysis_dates:
-        analysis_dates = ['2025-06-15','2025-07-14', '2025-07-20','2025-08-14']
-    
-    print(f"\n[Step 3] Analysis dates: {analysis_dates}")
-    
-    output_dir = config.paths['output_plots']
-    
+        print("[WARN] No dates specified in config. Add dates.analysis or dates.range to the site YAML.")
+        return
+
+    print(f"\n[Step 3] Analysis dates ({len(analysis_dates)}): {analysis_dates}")
+
+    base_plot_dir = config.paths['output_plots']
+
     for date_str in analysis_dates:
         print(f"\n{'='*70}")
         print(f"Analyzing {date_str}...")
         print(f"{'='*70}\n")
-        
+
         try:
             results = analyzer.analyze_single_day(
                 date_str=date_str,
@@ -123,9 +152,10 @@ def main():
                 alpha_p=config.physics['pressure']['alpha_p'],
                 bulk_density=config.site.get('bulk_density', 1.4)
             )
-            
+
             print_results_summary(results)
-            
+
+            output_dir = os.path.join(base_plot_dir, date_str.replace('-', ''))
             save_all_panels(config, analyzer, results, output_dir, prefix="crnp")
             
         except Exception as e:
@@ -135,13 +165,14 @@ def main():
     
     print(f"\n{'='*70}")
     print("Analysis completed!")
-    print(f"Output directory: {output_dir}")
-    print(f"Total panels per date: 5")
+    print(f"Output directory: {base_plot_dir}/<date>/")
+    print(f"Total panels per date: 6")
     print(f"  - Panel 01: SWC distribution")
     print(f"  - Panel 02: Vegetation map")
     print(f"  - Panel 03: Footprint boundary")
     print(f"  - Panel 04: Depth layers")
     print(f"  - Panel 05: Cross-section (Distance×Depth)")
+    print(f"  - Panel 06: Practical footprint (R86 vs detectable distance)")
     print(f"{'='*70}")
 
 if __name__ == "__main__":

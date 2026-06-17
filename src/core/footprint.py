@@ -155,11 +155,11 @@ class FootprintCalculator:
         
         # 가중치 계산
         weights = self.physics.depth_weighting_function(depths, theta, bulk_density, r)
-        weights_norm = weights / np.trapz(weights, depths)
+        weights_norm = weights / np.trapezoid(weights, depths)
         
         # 누적 분포
         cumulative = np.array([
-            np.trapz(weights_norm[:i+1], depths[:i+1])
+            np.trapezoid(weights_norm[:i+1], depths[:i+1])
             for i in range(len(depths))
         ])
         
@@ -175,7 +175,7 @@ class FootprintCalculator:
         for d_start, d_end in layers:
             idx_layer = (depths >= d_start) & (depths <= d_end)
             if np.any(idx_layer):
-                contrib = np.trapz(weights_norm[idx_layer], depths[idx_layer])
+                contrib = np.trapezoid(weights_norm[idx_layer], depths[idx_layer])
                 layer_contrib.append({
                     'layer': f'{d_start}-{d_end}cm',
                     'depth_start': d_start,

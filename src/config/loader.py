@@ -26,14 +26,19 @@ class Config:
         self.config_dir = config_dir
         self.sites_dir = os.path.join(config_dir, 'sites')
 
-        # 사이트별 설정 직접 로드 (default.yaml 사용 안 함)
+        # default.yaml을 베이스로 로드 후 사이트 설정을 deep merge
+        default_config_path = os.path.join(config_dir, 'default.yaml')
         site_config_path = os.path.join(self.sites_dir, f'{site_name}.yaml')
 
         if not os.path.exists(site_config_path):
             raise FileNotFoundError(f"Site config not found: {site_config_path}")
 
-        # 사이트 설정 로드
-        self._config = self._load_yaml(site_config_path)
+        if os.path.exists(default_config_path):
+            base = self._load_yaml(default_config_path)
+            site = self._load_yaml(site_config_path)
+            self._config = self._deep_merge(base, site)
+        else:
+            self._config = self._load_yaml(site_config_path)
 
         # Path templates 보존 (동적 site 변경을 위해)
         self._path_templates = copy.deepcopy(self._config.get('paths', {}))
@@ -117,8 +122,13 @@ class Config:
         if not os.path.exists(site_config_path):
             raise FileNotFoundError(f"Site config not found: {site_config_path}")
 
-        # 사이트 설정 직접 로드 (default.yaml과 병합하지 않음)
-        self._config = self._load_yaml(site_config_path)
+        default_config_path = os.path.join(self.config_dir, 'default.yaml')
+        if os.path.exists(default_config_path):
+            base = self._load_yaml(default_config_path)
+            site = self._load_yaml(site_config_path)
+            self._config = self._deep_merge(base, site)
+        else:
+            self._config = self._load_yaml(site_config_path)
 
         # Path templates 갱신
         self._path_templates = copy.deepcopy(self._config.get('paths', {}))

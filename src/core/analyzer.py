@@ -7,6 +7,7 @@ import numpy as np
 from .physics import CRNPPhysics
 from .interpolation import SWCInterpolator
 from .footprint import FootprintCalculator
+from .signal_contribution import SignalContribution
 
 class CRNPAnalyzer:
     """CRNP Footprint 분석기 (Horizontal + Vertical)"""
@@ -29,7 +30,10 @@ class CRNPAnalyzer:
         
         # Footprint 계산기
         self.footprint_calc = FootprintCalculator(config)
-        
+
+        # 신호 기여도 (원거리 기여도 / 실용적 footprint)
+        self.sigcon = SignalContribution(self.physics, config)
+
         # 데이터 로드
         self._load_data(geo_path, swc_path, pressure_path)
         
@@ -265,54 +269,50 @@ class CRNPAnalyzer:
         R = np.sqrt(Xi**2 + Yi**2)
         mask_r = R <= max_extent
 
-        # Pressure scaling
-        if (not use_pressure) or (pressure_hpa is None) or (not np.isfinite(pressure_hpa)):
-            sP = 1.0
-        else:
-            sP = (float(pressure_hpa) / float(P0)) ** float(alpha_p)
-
-        R_eff = R * sP
-
         theta = swc_map
         Hveg = float(height)
-
-        # 절대습도 (abs_humidity가 None이면 기본값 사용)
         h = abs_humidity if abs_humidity is not None else 5.0
 
-        # 수평 가중 함수 (토양수분 의존성 포함!)
-        Wr = self.physics.radial_intensity_function(R_eff, h=h, theta=theta, bulk_density=bulk_density)
-        
-        # 순수 커널 (vegetation/soil moisture 제외)
+        # 대표 토양수분 (r* 재스케일링 파라미터 함수는 스칼라 조건 가정)
+        theta_repr = float(np.nanmean(theta[mask_r]))
+
+        # r* 재스케일링: 기압 + 식생 + 전제 토양수분 (Schrön 2017)
+        R_star = self.physics.rescale_distance(
+            R, pressure_hpa=pressure_hpa if use_pressure else None,
+            Hveg=Hveg, theta=theta_repr, P0=P0
+        )
+
+        # 기압 스케일 팩터 (보고용)
+        if (not use_pressure) or (pressure_hpa is None) or (not np.isfinite(float(pressure_hpa) if pressure_hpa is not None else float('nan'))):
+            sP = 1.0
+        else:
+            sP = 0.4922 / (0.86 - np.exp(-float(pressure_hpa) / float(P0)))
+
+        # 완전한 Wr (r* 입력)
+        Wr = self.physics.radial_intensity_function(R_star, h=h, theta=theta_repr, bulk_density=bulk_density)
+
+        # 순수 커널 K = Wr/r (공간 가중만, 정규화)
         K = np.zeros_like(R, dtype=float)
-        mK = mask_r & np.isfinite(Wr) & np.isfinite(R_eff)
-        K[mK] = Wr[mK] / (R_eff[mK] + 1.0)
-        Ks = K.sum()
+        mK = mask_r & np.isfinite(Wr) & (R > 0)
+        K[mK] = Wr[mK] / R[mK]
+        Ks = np.nansum(K)
         if Ks > 0:
             K /= Ks
-        
-        # 식생 보정
-        fveg = self.physics.vegetation_correction_factor(theta, Hveg)
-        
-        # 중성자-토양수분 관계
-        N0 = self.config.physics['neutron_moisture']['N0']
-        params = self.config.physics['neutron_moisture']
-        p1, p2, p3, p4, p5, p6, p7, p8 = params['p1'], params['p2'], params['p3'], params['p4'], params['p5'], params['p6'], params['p7'], params['p8']
 
-        # h는 이미 위에서 정의됨 (abs_humidity 또는 기본값 5.0)
-        N_theta = N0 * (
-            (p1 + p2*theta) / (p1 + theta) * (p3 + p4*h + p5*h**2) +
-            np.exp(-p6*theta) * (p7 + p8*h)
-        )
-        
-        # 최종 기여도
-        mask = mask_r & np.isfinite(theta) & np.isfinite(N_theta)
+        # 식생 보정 및 중성자-토양수분 관계
+        fveg = self.physics.vegetation_correction_factor(theta, Hveg)
+        N0 = self.config.physics['neutron_moisture']['N0']
+        N_theta = self.physics.neutron_moisture_relationship(theta, h=h, N0=N0)
+
+        # 최종 기여도 C = Wr/r × fveg × N(θ)
+        mask = mask_r & np.isfinite(theta) & np.isfinite(N_theta) & (R > 0)
         C = np.zeros_like(R, dtype=float)
-        C[mask] = Wr[mask] * fveg[mask] * N_theta[mask] / (R_eff[mask] + 1.0)
-        
-        s = C.sum()
+        C[mask] = Wr[mask] * fveg[mask] * N_theta[mask] / R[mask]
+
+        s = np.nansum(C)
         if s > 0:
             C /= s
-        
+
         return C, float(sP), K
     
     def analyze_single_day(self, date_str, base_veg_height=0.3,
@@ -391,14 +391,14 @@ class CRNPAnalyzer:
             Xi, Yi, contribution, target=0.86
         )
 
-        # 해석적 R86 계산 (max_extent와 독립적)
+        # 해석적 R86 계산 (physics.py 기반, 토양수분 반영)
         h_for_R86 = abs_humidity if abs_humidity is not None else 5.0
-        R86_analytical = self.footprint_calc.calculate_analytical_R86(
+        R86_analytical = self.physics.calculate_analytical_R86(
             theta=predicted_swc,
             bulk_density=bulk_density,
             h=h_for_R86,
-            target=0.86,
-            r_max=500
+            pressure_hpa=pressure_hpa,
+            Hveg=veg_height
         )
 
         # 방향별 R86
@@ -419,6 +419,15 @@ class CRNPAnalyzer:
             n_points=100
         )
         
+        # 실용적 footprint 거리 (Schrön 2023 Eq.14)
+        press_for_fp = pressure_hpa if pressure_hpa is not None else 1013.25
+        practical_fp_wet = self.sigcon.practical_footprint_distance(
+            predicted_swc, dtheta=+0.10, sigma_N=0.01,
+            h=h_for_R86, pressure_hpa=press_for_fp, Hveg=veg_height)
+        practical_fp_dry = self.sigcon.practical_footprint_distance(
+            predicted_swc, dtheta=-0.10, sigma_N=0.01,
+            h=h_for_R86, pressure_hpa=press_for_fp, Hveg=veg_height)
+
         return {
             "date": date_str,
             "doy": doy,
@@ -441,6 +450,8 @@ class CRNPAnalyzer:
             "R86_radius": R86_radius,
             "R86_cum": R86_cum,
             "R86_analytical": R86_analytical,
+            "practical_footprint_wet_m": practical_fp_wet,
+            "practical_footprint_dry_m": practical_fp_dry,
             "ddeg": ddeg,
             "R86_phi_sectors": sectors,
             "use_pressure": use_pressure,
