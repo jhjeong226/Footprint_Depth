@@ -11,7 +11,7 @@ from .panel_06_practical_footprint import plot_panel_practical_footprint
 __all__ = [
     'plot_panel_swc',
     'plot_panel_veg',
-    'plot_panel_footprint_amoeba',
+    'plot_panel_footprint_cumulative',
     'plot_panel_depth_layers',
     'plot_panel_footprint_crosssection',
     'plot_panel_practical_footprint',
